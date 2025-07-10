@@ -29,8 +29,16 @@ export class CodeRunnerService {
             containers: [
               {
                 name: 'runner',
-                image: 'alpine',
-                command: ['echo', 'Hello from Job!'],
+                image: 'andy45630/typescript-code-runner',
+                env: [
+                  {
+                    name: 'CODE',
+                    value: `
+                            const msg: string = 'execute typescript code!!!';
+                            console.log(msg);
+                            `,
+                  },
+                ],
               },
             ],
             restartPolicy: 'Never',
@@ -47,6 +55,8 @@ export class CodeRunnerService {
 
     // 等待 Pod 結束
     const podName = await this.waitForPodCompletion(jobName);
+
+    // 取得 log
     const logs = await this.coreV1Api.readNamespacedPodLog({
       name: podName,
       namespace: 'default',
