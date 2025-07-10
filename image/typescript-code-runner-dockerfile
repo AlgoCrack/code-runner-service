@@ -1,0 +1,9 @@
+FROM node:20
+
+WORKDIR /runner
+
+# 安裝 ts-node 與 TypeScript 編譯器
+RUN npm install -g ts-node typescript
+
+# 將 env 中的 CODE 寫進檔案，並用 ts-node 執行。
+CMD ["bash", "-c", "echo \"$CODE\" > main.ts && ts-node --compiler-options '{ \"module\": \"CommonJS\" }' main.ts"]
