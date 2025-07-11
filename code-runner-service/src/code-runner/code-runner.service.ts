@@ -1,95 +1,29 @@
 import { Injectable } from '@nestjs/common';
-import * as k8s from '@kubernetes/client-node';
-import { v4 as uuidv4 } from 'uuid';
+import { ExcuteCodeRes, TestCase, Language } from './code-runner.dto';
+import { K8sService } from 'src/k8s/k8s.service';
 
 @Injectable()
 export class CodeRunnerService {
-  private batchV1Api: k8s.BatchV1Api;
-  private coreV1Api: k8s.CoreV1Api;
+  constructor(private k8sService: K8sService) {}
 
-  constructor() {
-    const kc = new k8s.KubeConfig();
-    kc.loadFromDefault(); // 通常會讀 ~/.kube/config 或在 K8s 中使用 service account
-    this.batchV1Api = kc.makeApiClient(k8s.BatchV1Api);
-    this.coreV1Api = kc.makeApiClient(k8s.CoreV1Api);
-  }
+  async executeCode(
+    testCases: TestCase[],
+    language: Language,
+    code: string,
+  ): Promise<ExcuteCodeRes> {
+    const image = `andy45630/${language}-code-runner`;
 
-  async executeCode(): Promise<string> {
-    // 生成唯一的 Job 名稱
-    const jobName = `runner-job-${uuidv4()}`;
-
-    // 建立 Job
-    const jobManifest: k8s.V1Job = {
-      metadata: { name: jobName },
-      spec: {
-        backoffLimit: 0,
-        template: {
-          metadata: { name: jobName },
-          spec: {
-            containers: [
-              {
-                name: 'runner',
-                image: 'andy45630/typescript-code-runner',
-                env: [
-                  {
-                    name: 'CODE',
-                    value: `
-                            const msg: string = 'execute typescript code!!!';
-                            console.log(msg);
-                            `,
-                  },
-                ],
-              },
-            ],
-            restartPolicy: 'Never',
-          },
-        },
-      },
-    };
-
-    // 在 default namespace 建立 job
-    await this.batchV1Api.createNamespacedJob({
-      namespace: 'default',
-      body: jobManifest,
-    });
-
-    // 等待 Pod 結束
-    const podName = await this.waitForPodCompletion(jobName);
-
-    // 取得 log
-    const logs = await this.coreV1Api.readNamespacedPodLog({
-      name: podName,
-      namespace: 'default',
-    });
-
-    // 清除 Job 和 Pod
-    await this.batchV1Api.deleteNamespacedJob({
-      name: jobName,
-      namespace: 'default',
-      propagationPolicy: 'Foreground',
-      gracePeriodSeconds: 0,
-    });
-
-    return logs;
-  }
-
-  private async waitForPodCompletion(jobName: string): Promise<string> {
-    let podName = '';
-    while (true) {
-      const body = await this.coreV1Api.listNamespacedPod({
-        namespace: 'default',
-      });
-      const pod = body.items.find(
-        (p) =>
-          p.metadata?.name?.startsWith(jobName) &&
-          p.status?.phase === 'Succeeded',
-      );
-      if (pod) {
-        podName = pod.metadata!.name!;
-        break;
+    for (const testCase of testCases) {
+      const codeRunnerRes = await this.k8sService.executeCode(code, image);
+      if (codeRunnerRes != testCase.output) {
+        return {
+          success: false,
+          input: testCase.input,
+          actualOutput: codeRunnerRes,
+          expectedOutput: testCase.output,
+        };
       }
-      await new Promise((res) => setTimeout(res, 1000));
     }
-    return podName;
+    return { success: true };
   }
 }
