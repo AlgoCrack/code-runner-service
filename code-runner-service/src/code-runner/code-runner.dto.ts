@@ -16,21 +16,30 @@ export enum Language {
 }
 
 export class ExecuteCodeReq {
-  @ApiProperty({ description: 'test cases', example: 1 })
+  @ApiProperty({
+    description: 'test cases',
+    example: [
+      {
+        input: [3, 4],
+        output: '7',
+      },
+      {
+        input: [2, 7],
+        output: '9',
+      },
+    ],
+  })
   @IsArray()
   testCases: TestCase[];
 
-  @ApiProperty({ description: 'program code', example: ' console.log(123); ' })
+  @ApiProperty({ description: 'program language', example: 'typescript' })
   @IsEnum(Language)
   language: Language;
 
   @ApiProperty({
-    description: 'function input',
-    example: { nums: '[1, 2, 3]', str: 'aaa' },
+    description: 'program code',
+    example: 'const run = (a: number, b: number): number => {return a + b;}',
   })
-  input: (string | number | boolean)[];
-
-  @ApiProperty({ description: 'program code', example: 'typescript' })
   @IsString()
   code: string;
 }
