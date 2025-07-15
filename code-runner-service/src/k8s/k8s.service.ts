@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import * as k8s from '@kubernetes/client-node';
 import { v4 as uuidv4 } from 'uuid';
+import { ExecuteCodeRes, Pod } from './k8s.dto';
 
 @Injectable()
 export class K8sService {
@@ -14,7 +15,7 @@ export class K8sService {
     this.coreV1Api = kc.makeApiClient(k8s.CoreV1Api);
   }
 
-  async executeCode(code: string, image: string): Promise<string> {
+  async executeCode(code: string, image: string): Promise<ExecuteCodeRes> {
     // 生成唯一的 Job 名稱
     const jobName = `runner-job-${uuidv4()}`;
 
@@ -51,7 +52,7 @@ export class K8sService {
     });
 
     // 等待 Pod 結束
-    const podName = await this.waitForPodCompletion(jobName);
+    const { podName, isPodSuccess } = await this.waitForPodCompletion(jobName);
 
     // 取得 log
     const logs = await this.coreV1Api.readNamespacedPodLog({
@@ -67,11 +68,13 @@ export class K8sService {
       gracePeriodSeconds: 0,
     });
 
-    return logs;
+    return { codeRunnerRes: logs, isPodSuccess };
   }
 
-  private async waitForPodCompletion(jobName: string): Promise<string> {
+  private async waitForPodCompletion(jobName: string): Promise<Pod> {
     let podName = '';
+    let isPodSuccess = false;
+
     while (true) {
       const body = await this.coreV1Api.listNamespacedPod({
         namespace: 'default',
@@ -79,14 +82,15 @@ export class K8sService {
       const pod = body.items.find(
         (p) =>
           p.metadata?.name?.startsWith(jobName) &&
-          p.status?.phase === 'Succeeded',
+          (p.status?.phase === 'Succeeded' || p?.status?.phase === 'Failed'),
       );
       if (pod) {
         podName = pod.metadata!.name!;
+        isPodSuccess = pod.status?.phase === 'Succeeded' ? true : false;
         break;
       }
       await new Promise((res) => setTimeout(res, 1000));
     }
-    return podName;
+    return { podName, isPodSuccess };
   }
 }

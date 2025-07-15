@@ -28,7 +28,7 @@ export class ExecuteCodeReq {
     description: 'function input',
     example: { nums: '[1, 2, 3]', str: 'aaa' },
   })
-  input: object;
+  input: (string | number | boolean)[];
 
   @ApiProperty({ description: 'program code', example: 'typescript' })
   @IsString()
@@ -53,6 +53,10 @@ export class ExcuteCodeRes {
   @ApiProperty({ description: 'function expectedOutput', example: '[0,1]' })
   @IsObject()
   expectedOutput?: string;
+
+  @ApiProperty({ description: 'error', example: 'error' })
+  @IsObject()
+  error?: string;
 }
 
 export class TestCase {
@@ -65,8 +69,7 @@ export class TestCase {
   problemId: number;
 
   @ApiProperty({ description: 'input', example: '1 + 1 = ?' })
-  @IsInt()
-  input: object;
+  input: (string | number | boolean)[];
 
   @ApiProperty({ description: 'input', example: 1 })
   @IsInt()
